@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>My Personal Calendar</title>
+    <title>Pro Calendar - Sync & Holidays</title>
     <style>
         :root {
             --primary: #1a73e8;
@@ -12,497 +12,258 @@
             --text: #202124;
             --text-secondary: #5f6368;
             --line: #dadce0;
-            --green: #188038;
-            --red: #d93025;
         }
 
         body {
             font-family: 'Google Sans', Roboto, sans-serif;
             background-color: var(--bg);
             color: var(--text);
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Prevent body scroll, handle internally */
+            margin: 0; padding: 0;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* --- 1. Top Bar & Auth --- */
+        /* Top App Bar */
         .app-bar {
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: white;
-            z-index: 10;
+            padding: 10px 16px;
+            display: flex; align-items: center; justify-content: space-between;
+            background: white; border-bottom: 1px solid var(--line);
         }
 
-        .date-selector {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 20px;
-            font-weight: 500;
+        .date-info { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 500; }
+
+        /* Profile & Login */
+        .auth-section { display: flex; align-items: center; gap: 12px; }
+
+        #loginBtn {
+            background-color: var(--primary); color: white; border: none;
+            padding: 8px 18px; border-radius: 20px; font-weight: 500; cursor: pointer;
         }
 
-        .profile-section {
-            display: flex;
-            align-items: center;
-        }
-
-        #authBtn {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 500;
-            cursor: pointer;
-            font-size: 14px;
-            transition: 0.2s;
-        }
-
-        #userProfile {
-            display: none; /* Hidden until logged in */
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-
-        #userAvatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: #eee;
-        }
-
-        /* --- 2. Connection Checker (Toaster) --- */
-        #connectionStatus {
-            position: fixed;
-            top: -50px; /* Hidden initially */
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--text);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            transition: top 0.3s ease;
-            z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
-        .offline .status-dot { background: var(--red); }
-
-        /* --- 3. Calendar Grid --- */
-        .calendar-wrapper {
-            flex: 0 0 auto; /* Don't shrink */
-            padding: 10px;
-            border-bottom: 1px solid var(--line);
-        }
-
-        .week-days {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            text-align: center;
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-
-        .month-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            row-gap: 2px;
-        }
-
-        .day-cell {
-            height: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .day-num {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            font-size: 14px;
-            transition: 0.1s;
-        }
-
-        /* States */
-        .day-cell.today .day-num {
-            background-color: var(--primary);
-            color: white;
-            font-weight: bold;
-        }
+        #userContainer { display: none; align-items: center; gap: 10px; cursor: pointer; position: relative; }
         
-        .day-cell.selected .day-num {
-            background-color: #e8f0fe;
-            color: var(--primary);
-            font-weight: bold;
-        }
-        /* Fix conflict if today is selected */
-        .day-cell.today.selected .day-num {
-            background-color: #1558b0;
-            color: white;
+        #userImg {
+            width: 35px; height: 35px; border-radius: 50%; 
+            border: 2px solid var(--line); object-fit: cover;
         }
 
-        .day-cell.has-event::after {
-            content: '';
-            width: 4px;
-            height: 4px;
-            background-color: var(--primary);
-            border-radius: 50%;
-            position: absolute;
-            bottom: 4px;
+        .logout-tooltip {
+            display: none; position: absolute; top: 45px; right: 0;
+            background: white; border: 1px solid var(--line);
+            padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 13px; white-space: nowrap; z-index: 100;
         }
-        .day-cell.other-month { opacity: 0; pointer-events: none; }
+        #userContainer:hover .logout-tooltip { display: block; }
 
-        /* --- 4. Event List --- */
-        .events-container {
-            flex: 1;
-            background-color: var(--surface);
-            overflow-y: auto;
-            padding: 20px;
+        /* Calendar Styling */
+        .calendar-section { padding: 10px; border-bottom: 1px solid var(--line); }
+        .week-days { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; color: var(--text-secondary); font-size: 12px; margin-bottom: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+        .day {
+            height: 45px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; position: relative; font-size: 14px;
         }
+        .day-inner { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .day.today .day-inner { background: var(--primary); color: white; }
+        .day.selected .day-inner { border: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
+        .dot { width: 4px; height: 4px; background: #1a73e8; border-radius: 50%; position: absolute; bottom: 5px; }
+        .dot.holiday { background: #188038; }
 
-        .selected-date-header {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
+        /* Events List */
+        .event-list { flex: 1; background: var(--surface); padding: 16px; overflow-y: auto; }
         .event-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            border-left: 4px solid var(--primary);
-            animation: slideUp 0.2s ease-out;
+            background: white; padding: 12px; border-radius: 10px; margin-bottom: 10px;
+            border-left: 4px solid var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
+        .event-card.holiday-item { border-left-color: #188038; }
+        .event-title { font-weight: 500; font-size: 15px; }
+        .event-time { font-size: 12px; color: var(--text-secondary); }
 
-        .event-time {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-        }
-
-        .event-title {
-            font-size: 15px;
-            font-weight: 500;
-        }
-
-        .empty-state {
-            text-align: center;
-            margin-top: 40px;
-            color: var(--text-secondary);
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Navigation Buttons */
-        .nav-btn {
-            background: none; border: none; font-size: 18px; cursor: pointer; padding: 5px 10px; color: var(--text-secondary);
+        .toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #323232; color: white; padding: 10px 20px; border-radius: 25px;
+            font-size: 14px; display: none; z-index: 1000;
         }
     </style>
 </head>
 <body>
 
-    <!-- Connection Toaster -->
-    <div id="connectionStatus"><div class="status-dot"></div><span id="connText">Online</span></div>
-
-    <!-- Header -->
     <div class="app-bar">
-        <div class="date-selector">
-            <span id="monthLabel">Loading...</span>
-            <div style="display:flex;">
-                <button class="nav-btn" onclick="changeMonth(-1)">&#10094;</button>
-                <button class="nav-btn" onclick="changeMonth(1)">&#10095;</button>
-            </div>
+        <div class="date-info">
+            <span id="monthDisplay">Month</span>
+            <div style="font-size: 12px; cursor: pointer;" onclick="changeMonth(-1)">◀</div>
+            <div style="font-size: 12px; cursor: pointer;" onclick="changeMonth(1)">▶</div>
         </div>
-        
-        <div class="profile-section">
-            <button id="authBtn" onclick="handleAuthClick()">Sign In</button>
-            <div id="userProfile" onclick="handleSignOut()">
-                <img id="userAvatar" src="" alt="Profile">
+        <div class="auth-section">
+            <button id="loginBtn" onclick="handleAuth()">Sign In</button>
+            <div id="userContainer" onclick="handleLogout()">
+                <img id="userImg" src="" alt="user">
+                <div class="logout-tooltip">Click to Sign Out</div>
             </div>
         </div>
     </div>
 
-    <!-- Calendar -->
-    <div class="calendar-wrapper">
+    <div class="calendar-section">
         <div class="week-days">
             <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
         </div>
-        <div id="calendarGrid" class="month-grid"></div>
+        <div id="calendarGrid" class="grid"></div>
     </div>
 
-    <!-- Events -->
-    <div class="events-container">
-        <div id="selectedDateLabel" class="selected-date-header">Events</div>
-        <div id="eventList">
-            <div class="empty-state">Sign in to see your schedule</div>
-        </div>
+    <div class="event-list" id="eventList">
+        <div style="text-align:center; color:gray; margin-top:50px;">Sign in to view Events & Holidays</div>
     </div>
 
-    <!-- SCRIPTS -->
+    <div id="toast" class="toast"></div>
+
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
     <script>
-        // --- CONFIGURATION ---
         const CLIENT_ID = '622928727799-2oea46426jasccd90g387copup7qd2gl.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDwBDIxVHcR1QpSGQzeVKFz1d2rtAWdHLE';
-        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
-        const SCOPES = 'https://www.googleapis.com/auth/calendar.events.readonly';
+        // Added 'profile' scope for user image
+        const SCOPES = 'https://www.googleapis.com/auth/calendar.events.readonly profile';
 
-        // --- STATE ---
         let tokenClient;
-        let gapiInited = false;
-        let gisInited = false;
         let currentDate = new Date();
         let selectedDate = new Date();
-        let eventsCache = []; // Store events here
+        let eventsData = [];
 
-        // --- INITIALIZATION ---
         function init() {
-            gapi.load('client', initGapi);
+            gapi.load('client', async () => {
+                await gapi.client.init({ apiKey: API_KEY, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
+                renderCalendar();
+            });
+
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: SCOPES,
-                callback: async (resp) => {
-                    if (resp.error) throw resp;
-                    await listEvents();
-                    updateProfileUI(true);
+                callback: (resp) => {
+                    if (resp.access_token) {
+                        fetchUserInfo(resp.access_token);
+                        fetchEvents();
+                    }
                 },
             });
-            gisInited = true;
-            checkAuth(); // Check connection state
         }
 
-        async function initGapi() {
-            await gapi.client.init({
-                apiKey: API_KEY,
-                discoveryDocs: [DISCOVERY_DOC],
-            });
-            gapiInited = true;
-            renderCalendar(); // Render empty grid first
+        async function fetchUserInfo(token) {
+            // Fetch profile picture using Google's userinfo endpoint
+            const resp = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
+            const user = await resp.json();
+            if (user.picture) {
+                document.getElementById('userImg').src = user.picture;
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('userContainer').style.display = 'flex';
+            }
         }
 
-        // --- AUTHENTICATION ---
-        function handleAuthClick() {
-            if (tokenClient === undefined) return;
-            // Trigger popup
+        function handleAuth() {
             tokenClient.requestAccessToken({prompt: 'consent'});
         }
 
-        function handleSignOut() {
+        function handleLogout() {
             const token = gapi.client.getToken();
-            if (token !== null) {
+            if (token) {
                 google.accounts.oauth2.revoke(token.access_token);
                 gapi.client.setToken('');
-                eventsCache = [];
-                updateProfileUI(false);
-                renderCalendar();
-                document.getElementById('eventList').innerHTML = '<div class="empty-state">Signed out</div>';
+                location.reload(); // Simple reload to clear all states
             }
         }
 
-        function updateProfileUI(isSignedIn) {
-            const authBtn = document.getElementById('authBtn');
-            const profile = document.getElementById('userProfile');
-            
-            if (isSignedIn) {
-                authBtn.style.display = 'none';
-                profile.style.display = 'flex';
-                // Note: Getting actual user avatar requires 'profile' scope and people API
-                // For this demo, we use a placeholder color or first letter
-                document.getElementById('userAvatar').style.backgroundColor = '#1a73e8';
-            } else {
-                authBtn.style.display = 'block';
-                profile.style.display = 'none';
-            }
-        }
-
-        // --- DATA FETCHING ---
-        async function listEvents() {
-            showToast("Syncing calendar...", "loading");
-            
-            // Fetch 3 months range (Prev, Current, Next)
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-            const timeMin = new Date(year, month - 1, 1).toISOString();
-            const timeMax = new Date(year, month + 2, 0).toISOString();
+        async function fetchEvents() {
+            showToast("Syncing...");
+            const timeMin = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
+            const timeMax = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString();
 
             try {
-                const request = {
-                    'calendarId': 'primary', // YOUR PERSONAL CALENDAR
-                    'timeMin': timeMin,
-                    'timeMax': timeMax,
-                    'showDeleted': false,
-                    'singleEvents': true,
-                    'maxResults': 200,
-                    'orderBy': 'startTime',
-                };
+                const [personal, holidays] = await Promise.all([
+                    gapi.client.calendar.events.list({ 'calendarId': 'primary', 'timeMin': timeMin, 'timeMax': timeMax, 'singleEvents': true }),
+                    gapi.client.calendar.events.list({ 'calendarId': 'en.indian#holiday@group.v.calendar.google.com', 'timeMin': timeMin, 'timeMax': timeMax, 'singleEvents': true })
+                ]);
+
+                const pItems = (personal.result.items || []).map(i => ({...i, isHoliday: false}));
+                const hItems = (holidays.result.items || []).map(i => ({...i, isHoliday: true}));
                 
-                const response = await gapi.client.calendar.events.list(request);
-                eventsCache = response.result.items;
+                eventsData = [...pItems, ...hItems];
                 renderCalendar();
-                selectDay(selectedDate); // Refresh view
-                showToast("Synced successfully", "success");
-            } catch (err) {
-                console.error(err);
-                showToast("Failed to load events", "offline");
+                showEventsForDate(selectedDate);
+            } catch (e) {
+                showToast("Error loading events");
             }
         }
 
-        // --- RENDER LOGIC ---
         function renderCalendar() {
             const grid = document.getElementById('calendarGrid');
-            const monthLabel = document.getElementById('monthLabel');
-            
+            const monthDisp = document.getElementById('monthDisplay');
             grid.innerHTML = '';
-            monthLabel.innerText = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            monthDisp.innerText = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+            const lastDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
 
-            // Previous Month Fillers
-            for(let i=0; i<firstDay; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'day-cell other-month';
-                grid.appendChild(cell);
-            }
+            for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
 
-            // Days
-            const today = new Date();
-            for(let d=1; d<=daysInMonth; d++) {
-                const cell = document.createElement('div');
-                cell.className = 'day-cell';
-                
-                // Date ID for logic
-                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                
-                // State Classes
-                if(d === today.getDate() && month === today.getMonth() && year === today.getFullYear()) cell.classList.add('today');
-                if(d === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear()) cell.classList.add('selected');
+            for (let i = 1; i <= lastDate; i++) {
+                const dayEl = document.createElement('div');
+                dayEl.className = 'day';
+                if (i === new Date().getDate() && currentDate.getMonth() === new Date().getMonth()) dayEl.classList.add('today');
+                if (i === selectedDate.getDate() && currentDate.getMonth() === selectedDate.getMonth()) dayEl.classList.add('selected');
 
-                // Check Events
-                const hasEvent = eventsCache.some(e => {
-                    const start = e.start.dateTime || e.start.date;
-                    return start.startsWith(dateStr);
-                });
-                if(hasEvent) cell.classList.add('has-event');
+                const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                const hasHoliday = eventsData.some(e => e.isHoliday && (e.start.date || e.start.dateTime).includes(dateStr));
+                const hasEvent = eventsData.some(e => !e.isHoliday && (e.start.date || e.start.dateTime).includes(dateStr));
 
-                cell.innerHTML = `<div class="day-num">${d}</div>`;
-                
-                // Click
-                cell.onclick = () => selectDay(new Date(year, month, d));
-                
-                grid.appendChild(cell);
+                dayEl.innerHTML = `<div class="day-inner">${i}</div>`;
+                if (hasEvent) dayEl.innerHTML += `<div class="dot"></div>`;
+                if (hasHoliday) dayEl.innerHTML += `<div class="dot holiday" style="bottom:2px"></div>`;
+
+                dayEl.onclick = () => {
+                    selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+                    renderCalendar();
+                    showEventsForDate(selectedDate);
+                };
+                grid.appendChild(dayEl);
             }
         }
 
-        function selectDay(date) {
-            selectedDate = date;
-            renderCalendar(); // Redraw grid for selection circle
-            
+        function showEventsForDate(date) {
             const list = document.getElementById('eventList');
-            const label = document.getElementById('selectedDateLabel');
+            list.innerHTML = `<div style="font-size:12px; color:gray; margin-bottom:10px;">${date.toDateString().toUpperCase()}</div>`;
             
-            label.innerText = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            list.innerHTML = '';
-
-            // Filter Events
             const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-            
-            const daysEvents = eventsCache.filter(e => {
-                const start = e.start.dateTime || e.start.date;
-                return start.startsWith(dateStr);
-            });
+            const filtered = eventsData.filter(e => (e.start.date || e.start.dateTime).includes(dateStr));
 
-            if(daysEvents.length === 0) {
-                list.innerHTML = `<div class="empty-state">No events scheduled</div>`;
+            if (filtered.length === 0) {
+                list.innerHTML += `<div style="text-align:center; margin-top:20px; color:gray;">No events found</div>`;
                 return;
             }
 
-            daysEvents.forEach(e => {
-                let timeStr = "All Day";
-                if(e.start.dateTime) {
-                    const t = new Date(e.start.dateTime);
-                    timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                }
-
-                const card = document.createElement('div');
-                card.className = 'event-card';
-                card.innerHTML = `
-                    <div class="event-time">${timeStr}</div>
-                    <div class="event-title">${e.summary || '(No Title)'}</div>
+            filtered.forEach(e => {
+                const div = document.createElement('div');
+                div.className = `event-card ${e.isHoliday ? 'holiday-item' : ''}`;
+                div.innerHTML = `
+                    <div class="event-time">${e.isHoliday ? '🇮🇳 Holiday' : '⏰ Personal'}</div>
+                    <div class="event-title">${e.summary}</div>
                 `;
-                list.appendChild(card);
+                list.appendChild(div);
             });
         }
 
-        function changeMonth(dir) {
-            currentDate.setMonth(currentDate.getMonth() + dir);
-            renderCalendar();
-            // Fetch new data if logged in
-            if(gapi.client.getToken()) listEvents();
+        function changeMonth(step) {
+            currentDate.setMonth(currentDate.getMonth() + step);
+            if (gapi.client.getToken()) fetchEvents();
+            else renderCalendar();
         }
 
-        // --- UTILS: Connection Checker ---
-        function checkAuth() {
-            window.addEventListener('online', () => showToast("Back online", "success"));
-            window.addEventListener('offline', () => showToast("No internet connection", "offline"));
+        function showToast(m) {
+            const t = document.getElementById('toast');
+            t.innerText = m; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
         }
 
-        function showToast(msg, type) {
-            const t = document.getElementById('connectionStatus');
-            const txt = document.getElementById('connText');
-            const dot = t.querySelector('.status-dot');
-            
-            txt.innerText = msg;
-            t.style.top = '20px'; // Show
-            
-            if(type === 'offline') {
-                t.className = 'offline';
-                dot.style.background = '#d93025';
-            } else {
-                t.className = '';
-                dot.style.background = '#188038';
-            }
-
-            // Hide after 3s if success
-            if(type !== 'loading') {
-                setTimeout(() => { t.style.top = '-50px'; }, 3000);
-            }
-        }
-
-        // Start
         window.onload = init;
-
     </script>
 </body>
 </html>
